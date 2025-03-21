@@ -1,3 +1,5 @@
 omegaconf
 torch
 numpy
+scipy
+torchaudio

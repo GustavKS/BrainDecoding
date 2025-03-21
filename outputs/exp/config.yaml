@@ -1,2 +1,3 @@
 batch_size: 64
 experiment_folder: exp
+root_dir: C:\Users\gschmidt\LabRotation2
