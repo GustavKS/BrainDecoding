@@ -1,0 +1,3 @@
+experiment_folder: exp
+
+batch_size: 64
