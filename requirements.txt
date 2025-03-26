@@ -3,3 +3,9 @@ torch
 numpy
 scipy
 torchaudio
+wandb
+tqdm
+transformers
+mne
+mne-bids
+natsort

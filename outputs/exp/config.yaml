@@ -1,3 +1,5 @@
 batch_size: 64
 experiment_folder: exp
+no_stim_training: true
 root_dir: C:\Users\gschmidt\LabRotation2
+use_wandb: false

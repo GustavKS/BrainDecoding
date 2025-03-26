@@ -3,5 +3,6 @@ experiment_folder: exp
 root_dir: C:\Users\gschmidt\LabRotation2
 
 batch_size: 64
+no_stim_training: True
 
 use_wandb: False

@@ -9,6 +9,9 @@ class CLIPLoss(nn.Module):
     self.temperature = 0.07
 
   def forward(self, stim_emb, brain_emb):
+    stim_emb = stim_emb.reshape(stim_emb.shape[0], -1)
+    brain_emb = brain_emb.reshape(brain_emb.shape[0], -1)
+    
     targets = torch.arange(stim_emb.shape[0]).to(stim_emb.device)
 
     ## To Dos: - Normalize embeddings
