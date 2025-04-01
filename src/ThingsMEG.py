@@ -103,7 +103,7 @@ class ThingsMEGDataset(torch.utils.data.Dataset):
      img_path = self.imgs[idx]
      img = Image.open(img_path).convert("RGB")
      image = self.transform(img)
-     return self.meg[idx], image, self.subject_ids[idx], self.categories[idx]
+     return image, self.meg[idx], self.subject_ids[idx], self.categories[idx]
 
 
         

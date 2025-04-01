@@ -30,7 +30,7 @@ if __name__ == "__main__":
     wandb.run.name = experiment_folder
     wandb.run.save()
 
-  brain_encoder = brain_enc.BrainEncoder(ds.num_subjects).to(device)
+  brain_encoder = brain_enc.BrainEncoder([1, 2, 3, 4]).to(device)
   stim_encoder = img_encoder.ImageEncoder().to(device)
 
   loss_fn = CLIPLoss().to(device)
@@ -46,14 +46,12 @@ if __name__ == "__main__":
  
     brain_encoder.train()
 
-    for i, batch in enumerate(tqdm(dataloader)):
-      stim, brain, subj_idx = batch
-      stim, brain = stim.squeeze(1), brain.squeeze(1)
+    for i, batch in enumerate(tqdm(dataloader, desc="Train")):
+      stim, brain, subj_idxs, label = batch
       stim, brain = stim.to(device), brain.to(device)
 
-
       Z_stim = stim_encoder(stim)
-      Z_brain = brain_encoder(brain, subj_idx)
+      Z_brain = brain_encoder(brain, subj_idxs)
 
       loss = loss_fn(Z_stim, Z_brain)
       optimizer.zero_grad()
