@@ -2,15 +2,14 @@ from omegaconf import OmegaConf
 import numpy as np
 
 import torch
-import wandb
+import torch.nn as nn
+import torchvision
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from models import img_encoder
-from models import brain_enc
+from models import naive_dec, brain_enc
 from utils import parse_args, load_yaml_config, make_exp_folder
-import src.Brennan2018 as Brennan2018
-from loss import CLIPLoss
-
+import our_dataset as our_dataset
 
 if __name__ == "__main__":
   args = parse_args()
@@ -20,45 +19,83 @@ if __name__ == "__main__":
 
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-  ds = Brennan2018.BrennanDataset(config=config)
+  writer = SummaryWriter(experiment_folder)
+  datasets = []
+  subjects = [2, 7, 10, 11]
+  for i in subjects:
+    datasets.append(our_dataset.meg_dataset(config=config, s=i, train=True))
+  
+  dataset = torch.utils.data.ConcatDataset(datasets)
+  train_idcs = np.arange(0, len(dataset))
+  np.random.seed(42)
+  np.random.shuffle(train_idcs)
+  train_idcs = train_idcs[:int(len(train_idcs)*0.8)]
+  val_idcs = np.setdiff1d(np.arange(0, len(dataset)), train_idcs)
+  train_dataset = torch.utils.data.Subset(dataset, train_idcs)
+  val_dataset = torch.utils.data.Subset(dataset, val_idcs)
 
-  dataloader = torch.utils.data.DataLoader(ds, batch_size=config['batch_size'], shuffle=True)
+  train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
+  val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False)
 
-  if config["use_wandb"]:
-    wandb.config = {k: v for k, v in config.items() if k not in ["use_wandb", "wandb_project"]}
-    wandb.init(project="BrainDecoding", config=wandb.config, save_code=True)
-    wandb.run.name = experiment_folder
-    wandb.run.save()
+  if config["naive"]:
+    backbone = torchvision.models.resnet18(weights=None)
+    backbone.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+    model = naive_dec.NaiveModel(backbone).to(device)
+  else:
+     model = brain_enc.BrainEncoder(subjects).to(device)
 
-  brain_encoder = brain_enc.BrainEncoder([1, 2, 3, 4]).to(device)
-  stim_encoder = img_encoder.ImageEncoder().to(device)
+  optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+  loss_fn = nn.CrossEntropyLoss()
+  val_accs = []
+  for epoch in range(50):
+      model.train()
+      progress_bar = tqdm(train_dataloader, desc=f'Epoch {epoch+1}', unit='batch', leave=False)
+      lossinho = 0
+      correct = 0
+      total = 0
+      for idx, (data, target, sbjs) in enumerate(progress_bar):
+          target = [0 if i == 43 else 1 for i in target]
+          data = data.reshape(data.shape[0], 1, data.shape[1], data.shape[2])
+          data, target = data.to(device), torch.tensor(target).to(device)
+          output = model(data, sbjs)
+          loss = loss_fn(output, target)
+          optimizer.zero_grad()
+          loss.backward()
+          optimizer.step()
+          lossinho += loss.item()
 
-  loss_fn = CLIPLoss().to(device)
+          _, predicted = torch.max(output.data, 1)
+          total += target.size(0)
+          correct += (predicted == target).sum().item()
 
-  optimizer = torch.optim.Adam(list(brain_encoder.parameters()) + list(stim_encoder.parameters()), lr=1e-4)
+          progress_bar.set_postfix(loss=lossinho/(idx+1))
+      accuracy = 100 * correct / total
+      print(f'Epoch {epoch+1} Loss: {lossinho/len(train_dataloader):.4f}')
+      writer.add_scalar('Loss/train', lossinho/len(train_dataloader), epoch)
+      writer.add_scalar('Accuracy/train', accuracy, epoch)
 
-  if config['no_stim_training']:
-    for param in stim_encoder.parameters():
-      param.requires_grad = False
+      model.eval()
+      with torch.no_grad():
+          correct = 0
+          total = 0
+          lossinho = 0
+          for data, target, sbjs in val_dataloader:
+              target = [0 if i == 43 else 1 for i in target]
+              data = data.reshape(data.shape[0], 1, data.shape[1], data.shape[2])
+              data, target = data.to(device), torch.tensor(target).to(device)
+              output = model(data, sbjs)
+              loss = loss_fn(output, target)
+              lossinho += loss.item()
+              _, predicted = torch.max(output.data, 1)
+              total += target.size(0)
+              correct += (predicted == target).sum().item()
+          accuracy = 100 * correct / total
+          print(f'Accuracy: {accuracy:.2f}%, Loss: {lossinho/len(val_dataloader):.4f}')
+      writer.add_scalar('Loss/val', lossinho/len(val_dataloader), epoch)
+      writer.add_scalar('Accuracy/val', accuracy, epoch)
 
-  for epoch in range(100):
-    train_losses, test_losses = [], []
- 
-    brain_encoder.train()
-
-    for i, batch in enumerate(tqdm(dataloader, desc="Train")):
-      stim, brain, subj_idxs, label = batch
-      stim, brain = stim.to(device), brain.to(device)
-
-      Z_stim = stim_encoder(stim)
-      Z_brain = brain_encoder(brain, subj_idxs)
-
-      loss = loss_fn(Z_stim, Z_brain)
-      optimizer.zero_grad()
-      loss.backward()
-      optimizer.step()
-
-      train_losses.append(loss.item())
-
-    if epoch % 2 == 0:
-      print(f"Epoch: {epoch}, Train Loss: {np.mean(train_losses)}")
+      val_accs.append(accuracy)
+      if accuracy == max(val_accs):
+          torch.save(model.state_dict(), f'{experiment_folder}/best_model.pth')
+          print(f'Saved best model at epoch {epoch+1}')
+  writer.close()

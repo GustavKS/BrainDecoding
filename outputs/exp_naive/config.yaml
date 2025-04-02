@@ -1,0 +1,4 @@
+batch_size: 64
+experiment_folder: exp_naive
+naive: true
+root_dir: \\memo-15\DataE\MEGA\raw

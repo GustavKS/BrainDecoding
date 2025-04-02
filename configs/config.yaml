@@ -1,8 +1,6 @@
-experiment_folder: exp
+experiment_folder: exp_naive_sbj_layer
 
-root_dir: C:\Users\gschmidt\LabRotation2
+root_dir: \\memo-15\DataE\MEGA\raw
 
 batch_size: 64
-no_stim_training: True
-
-use_wandb: False
+naive: True
