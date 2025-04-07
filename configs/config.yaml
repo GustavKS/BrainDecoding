@@ -1,6 +1,8 @@
-experiment_folder: exp_naive_sbj_layer
+experiment_folder: exp_naive_6_sbj_layer_channel_dropout
 
 root_dir: \\memo-15\DataE\MEGA\raw
+
+clamp: 5.0
 
 batch_size: 64
 naive: True

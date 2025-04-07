@@ -1,12 +1,18 @@
 import torch
 import torch.nn as nn
 
-class CustomBatchNorm1d(nn.BatchNorm1d):
-    def forward(self, input):
-        if input.size(0) == 1:
-            return input
-        return super().forward(input)
-    
+class channel_dropout(nn.Module):
+    def __init__(self, num_channels: int = 295):
+        super().__init__()
+        self.num_channels = num_channels
+
+    def forward(self, x: torch.Tensor, p: float = 0.1):
+        if self.training:
+            batch_size, channels, time = x.shape
+            dropout_mask = (torch.rand(batch_size, channels, 1, device=x.device) > p).float()
+            x = x * dropout_mask
+        return x
+
 class SubjectBlock(nn.Module):
     def __init__(
         self,
@@ -38,8 +44,7 @@ class SubjectBlock(nn.Module):
         )
 
     def forward(self, X: torch.Tensor, subject_idxs):
-
-        X = self.conv(X)  # ( B, 270, 256 )
+        X = self.conv(X)    
         X = torch.cat(
             [
                 self.subject_layer[i](x.unsqueeze(dim=0))
@@ -47,12 +52,20 @@ class SubjectBlock(nn.Module):
             ]
         )
         return X
+    
+class CustomBatchNorm1d(nn.BatchNorm1d):
+    def forward(self, input):
+        if input.size(0) == 1:
+            return input
+        return super().forward(input)
 
 class NaiveModel(nn.Module):
-    def __init__(self, backbone: nn.Module):
+    def __init__(self, backbone: nn.Module, num_subjects: int):
         super().__init__()
 
-        self.subject_block = SubjectBlock(num_subjects=4)
+        self.channel_dropout = channel_dropout(num_channels=295)
+
+        self.subject_block = SubjectBlock(num_subjects=num_subjects)
 
         self.backbone = backbone
 
@@ -78,10 +91,17 @@ class NaiveModel(nn.Module):
             nn.Linear(64, 2),
         )
 
-    def forward(self, x, s, subject_layer:bool=True):
+    def forward(self, x, s, sbj_list, subject_layer:bool=True, chl_dropout:bool=True):
+        s_mapping = {subject: idx for idx, subject in enumerate(sbj_list)}
+        s = [s_mapping[int(i)] for i in s]
+
+        if chl_dropout:
+            x = self.channel_dropout(x)
+
         if subject_layer:
             x = self.subject_block(x, s)
-            print("Using subject layer")
+            
+        x = x.unsqueeze(1)
         x = self.backbone(x)
         output = self.cls_head(x)
         return output

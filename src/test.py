@@ -6,7 +6,7 @@ import torch.nn as nn
 import torchvision
 
 from models import naive_dec, brain_enc
-from utils import parse_args, load_yaml_config, make_exp_folder
+from utils import parse_args, load_yaml_config
 import our_dataset as our_dataset
 
 if __name__ == "__main__":
@@ -17,20 +17,20 @@ if __name__ == "__main__":
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
   datasets = []
-  subjects = [2, 7, 10, 11]
+  subjects = [2, 4, 5, 7, 10, 11]
   for i in subjects:
     datasets.append(our_dataset.meg_dataset(config=config, s=i, train=False))
   
   dataset = torch.utils.data.ConcatDataset(datasets)
 
-  print("Expected Number of samples:", 1600, "Actual Number of samples:", len(dataset))
+  print("Expected Number of samples:", 400 * 1 * len(subjects), "Actual Number of samples:", len(dataset))
 
   test_dataloader = torch.utils.data.DataLoader(dataset, batch_size=config['batch_size'], shuffle=False)
 
   backbone = torchvision.models.resnet18(weights=None)
   backbone.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-  model = naive_dec.NaiveModel(backbone).to(device)
-  model.load_state_dict(torch.load('outputs/exp_naive/best_model.pth', map_location=device))
+  model = naive_dec.NaiveModel(backbone, num_subjects=len(subjects)).to(device)
+  model.load_state_dict(torch.load('outputs/exp_naive_6_sbj_layer/best_model.pth', map_location=device))
   model = model.to(device)
 
   optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
@@ -40,10 +40,9 @@ if __name__ == "__main__":
       subject_accuracies = {}
       for data, target, sbjs in test_dataloader:
           target = [0 if i == 43 else 1 for i in target]
-          data = data.reshape(data.shape[0], 1, data.shape[1], data.shape[2])
           data, target = data.to(device), torch.tensor(target).to(device)
           
-          output = model(data, sbjs)
+          output = model(data, sbjs, subjects)
           _, predicted = torch.max(output.data, 1)
           
           for i, subj in enumerate(sbjs):
