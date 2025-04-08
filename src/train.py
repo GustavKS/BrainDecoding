@@ -21,7 +21,7 @@ if __name__ == "__main__":
   args = parse_args()
   config = load_yaml_config(config_filename=args.config)
   config = OmegaConf.create(config)
-  config['experiment_folder'] = f"{config.get('experiment_folder')}_{str(len(subjects))}sbjs_drop{config.get('p_channel_dropout')}_{datetime.now().strftime("%Y%m%d")}"
+  config['experiment_folder'] = f"{config.get('experiment_folder')}_{str(len(subjects))}sbjs_drop{config.get('p_channel_dropout')}_{datetime.now().strftime('%Y%m%d')}"
   experiment_folder = make_exp_folder(config)
 
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -14,7 +14,7 @@ if __name__ == "__main__":
     config = load_yaml_config(config_filename=args.config)
     config = OmegaConf.create(config)
 
-    root = config['test_dir']
+    root = "outputs/exp_7_sbj_layer_channel_dropout_0.4_sched_20250408/"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
