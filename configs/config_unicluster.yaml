@@ -1,6 +1,6 @@
 experiment_folder: exp
 
-root_dir: C:/Data/raw/
+root_dir: /home/tu/tu_tu/tu_zxolg48/data/raw/
 
 clamp: 5.0
 

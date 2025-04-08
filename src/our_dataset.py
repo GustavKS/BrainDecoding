@@ -1,4 +1,5 @@
 import os
+import re
 import numpy as np
 import torch
 import mne
@@ -17,7 +18,7 @@ def scale_clamp(X: np.ndarray, clamp_lim: float = 5.0, clamp: bool = True) -> np
 class meg_dataset(torch.utils.data.Dataset):
   def __init__(self, config, s: int, train: bool):
     self.root = config['root_dir']
-    nights = ['night1', 'night2', 'night3', 'night4']	#
+    nights = ['night1', 'night2', 'night3', 'night4']
     if s == 4 or s == 5:
       nights = ['night1', 'night3', 'night4', 'night5']
     np.random.seed(s)
@@ -35,7 +36,9 @@ class meg_dataset(torch.utils.data.Dataset):
     for night in nights:
       print(f"Loading {s} {night}")
       data_path_folder = os.path.join(self.root, rf'{s}\{night}')
-      wm = os.listdir(data_path_folder)[-1]
+      files = [f for f in os.listdir(data_path_folder) if re.match(r'^\d', f)]
+      files.sort()
+      wm = files[-1]
       self.data_path = os.path.join(self.root, rf'{s}\{night}\{wm}')
 
       raw = mne.io.read_raw_ctf(self.data_path, preload=True, verbose=False)

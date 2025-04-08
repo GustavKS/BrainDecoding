@@ -6,7 +6,7 @@ class channel_dropout(nn.Module):
         super().__init__()
         self.num_channels = num_channels
 
-    def forward(self, x: torch.Tensor, p: float = 0.1):
+    def forward(self, x: torch.Tensor, p):
         if self.training:
             batch_size, channels, time = x.shape
             dropout_mask = (torch.rand(batch_size, channels, 1, device=x.device) > p).float()
@@ -60,8 +60,12 @@ class CustomBatchNorm1d(nn.BatchNorm1d):
         return super().forward(input)
 
 class NaiveModel(nn.Module):
-    def __init__(self, backbone: nn.Module, num_subjects: int):
+    def __init__(self, backbone: nn.Module, num_subjects: int, config):
         super().__init__()
+
+        self.channel_dropout = config["channel_dropout"]
+        self.p_channel_dropout = config["p_channel_dropout"]
+        self.subject_layer = config["subject_layer"]
 
         self.channel_dropout = channel_dropout(num_channels=295)
 
@@ -91,14 +95,14 @@ class NaiveModel(nn.Module):
             nn.Linear(64, 2),
         )
 
-    def forward(self, x, s, sbj_list, subject_layer:bool=True, chl_dropout:bool=True):
+    def forward(self, x, s, sbj_list):
         s_mapping = {subject: idx for idx, subject in enumerate(sbj_list)}
         s = [s_mapping[int(i)] for i in s]
 
-        if chl_dropout:
-            x = self.channel_dropout(x)
+        if self.channel_dropout:
+            x = self.channel_dropout(x, p=self.p_channel_dropout)
 
-        if subject_layer:
+        if self.subject_layer:
             x = self.subject_block(x, s)
             
         x = x.unsqueeze(1)
