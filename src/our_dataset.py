@@ -35,11 +35,11 @@ class meg_dataset(torch.utils.data.Dataset):
     cprint("Analysing Subject: " + s + ", nights: " + str(nights), 'blue', attrs=['bold'])
     for night in nights:
       print(f"Loading {s} {night}")
-      data_path_folder = os.path.join(self.root, rf'{s}\{night}')
-      files = [f for f in os.listdir(data_path_folder) if re.match(r'^\d', f)]
+      data_path_folder = os.path.join(self.root, s, night)
+      files = [f for f in os.listdir(data_path_folder)]
       files.sort()
       wm = files[-1]
-      self.data_path = os.path.join(self.root, rf'{s}\{night}\{wm}')
+      self.data_path = os.path.join(self.root, s, night, wm)
 
       raw = mne.io.read_raw_ctf(self.data_path, preload=True, verbose=False)
       raw.pick_types(meg=True, stim=True, eeg=False, ref_meg=True, verbose=False)
