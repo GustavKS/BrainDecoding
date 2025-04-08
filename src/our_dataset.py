@@ -18,9 +18,9 @@ def scale_clamp(X: np.ndarray, clamp_lim: float = 5.0, clamp: bool = True) -> np
 class meg_dataset(torch.utils.data.Dataset):
   def __init__(self, config, s: int, train: bool):
     self.root = config['root_dir']
-    nights = ['night1', 'night2', 'night3', 'night4']
+    nights = ['Night1', 'Night2', 'Night3', 'Night4']
     if s == 4 or s == 5:
-      nights = ['night1', 'night3', 'night4', 'night5']
+      nights = ['Night1', 'Night3', 'Night4', 'Night5']
     np.random.seed(s)
     np.random.shuffle(nights)
     if train: 
