@@ -1,8 +1,8 @@
-experiment_folder: exp
+experiment_folder: exp_noclamp
 
 root_dir: /home/tu/tu_tu/tu_zxolg48/data/raw/
 
-clamp: 5.0
+clamp: 1000.0
 
 batch_size: 128
 learning_rate: 1e-4
