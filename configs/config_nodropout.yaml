@@ -1,4 +1,4 @@
-experiment_folder: exp
+experiment_folder: exp_no_dropout
 
 root_dir: /vol/megdata/raw/
 
@@ -9,7 +9,7 @@ learning_rate: 1e-4
 num_epochs: 150
 
 
-channel_dropout: True
+channel_dropout: False
 p_channel_dropout: 0.2
 attention: True
 subject_layer: True

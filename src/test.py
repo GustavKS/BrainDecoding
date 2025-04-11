@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torchvision
 
-from models import naive_dec, brain_enc
+from models import naive_dec
 from utils import parse_args, load_yaml_config
 import our_dataset as our_dataset
 
@@ -14,8 +14,8 @@ if __name__ == "__main__":
     config = load_yaml_config(config_filename=args.config)
     config = OmegaConf.create(config)
 
-    root = "outputs/exp_nosbjlayer_7sbjs_drop0.4_20250408/"
-
+    root = args.root if args.root is not None else "outputs/test_7sbjs_drop0.1_20250411"
+    root = root + "/"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     datasets = []
@@ -34,8 +34,6 @@ if __name__ == "__main__":
     model = naive_dec.NaiveModel(backbone, num_subjects=len(subjects), config=config).to(device)
     model.load_state_dict(torch.load(root + 'best_model.pth', map_location=device))
     model = model.to(device)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
     model.eval()
     all_test_outputs, all_test_labels, all_subjects = [], [], []

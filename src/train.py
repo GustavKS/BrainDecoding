@@ -24,6 +24,8 @@ if __name__ == "__main__":
   config['experiment_folder'] = f"{config.get('experiment_folder')}_{str(len(subjects))}sbjs_drop{config.get('p_channel_dropout')}_{datetime.now().strftime('%Y%m%d')}"
   experiment_folder = make_exp_folder(config)
 
+  print(f"[EXP_FOLDER]{experiment_folder}")
+
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
   writer = SummaryWriter(experiment_folder)
@@ -34,6 +36,7 @@ if __name__ == "__main__":
     cprint("Subject: " + str(i) + ", Number of samples: " + str(len(datasets[-1])), "yellow")
   
   dataset = torch.utils.data.ConcatDataset(datasets)
+
   print("Expected Number of samples:", 3*400*len(subjects), "Actual Number of samples:", len(dataset))
   train_idcs = np.arange(0, len(dataset))
   np.random.seed(42)
@@ -51,7 +54,7 @@ if __name__ == "__main__":
   model = naive_dec.NaiveModel(backbone, len(subjects), config).to(device)
 
   optimizer = torch.optim.Adam(model.parameters(), lr=float(config['learning_rate']))
-  scheduler = CosineAnnealingLR(optimizer, T_max=config['num_epochs'], eta_min=1e-6)
+  scheduler = CosineAnnealingLR(optimizer, T_max=config['num_epochs'], eta_min=1e-5)
   loss_fn = nn.CrossEntropyLoss()
 
   val_losses = []

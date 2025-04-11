@@ -1,4 +1,4 @@
-experiment_folder: exp
+experiment_folder: exp_no_attention
 
 root_dir: /vol/megdata/raw/
 
@@ -11,5 +11,5 @@ num_epochs: 150
 
 channel_dropout: True
 p_channel_dropout: 0.2
-attention: True
+attention: False
 subject_layer: True

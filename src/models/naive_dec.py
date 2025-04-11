@@ -1,5 +1,46 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+
+
+class SpatialAttention(nn.Module):
+  def __init__(
+    self, loc: torch.Tensor, D1: int, K: int
+):
+    super().__init__()
+
+    x, y = loc.T
+
+    self.z_re = nn.Parameter(torch.Tensor(D1, K, K))
+    self.z_im = nn.Parameter(torch.Tensor(D1, K, K))
+    nn.init.kaiming_uniform_(self.z_re, a=np.sqrt(5))
+    nn.init.kaiming_uniform_(self.z_im, a=np.sqrt(5))
+
+    k_arange = torch.arange(K)
+    rad1 = torch.einsum("k,c->kc", k_arange, x)
+    rad2 = torch.einsum("l,c->lc", k_arange, y)
+    rad = rad1.unsqueeze(1) + rad2.unsqueeze(0)
+    self.register_buffer("cos", torch.cos(2 * torch.pi * rad))
+    self.register_buffer("sin", torch.sin(2 * torch.pi * rad))
+
+  def forward(self, X: torch.Tensor) -> torch.Tensor:
+      """_summary_
+
+      Args:
+          X ( b, c, t ): _description_
+
+      Returns:
+          _type_: _description_
+      """
+
+      real = torch.einsum("dkl,klc->dc", self.z_re, self.cos)
+      imag = torch.einsum("dkl,klc->dc", self.z_im, self.sin)
+
+      a = F.softmax(real + imag, dim=-1) 
+
+      return torch.einsum("oi,bit->bot", a, X)
+
 
 class channel_dropout(nn.Module):
     def __init__(self, num_channels: int = 295):
@@ -23,6 +64,7 @@ class SubjectBlock(nn.Module):
         super().__init__()
 
         self.num_subjects = num_subjects
+        self.num_channels = num_channels
 
         self.conv = nn.Conv1d(
             in_channels=num_channels,
@@ -44,7 +86,8 @@ class SubjectBlock(nn.Module):
         )
 
     def forward(self, X: torch.Tensor, subject_idxs):
-        X = self.conv(X)    
+        if X.shape[1] == self.num_channels:
+            X = self.conv(X)    
         X = torch.cat(
             [
                 self.subject_layer[i](x.unsqueeze(dim=0))
@@ -65,9 +108,18 @@ class NaiveModel(nn.Module):
 
         self.channel_dropout = config["channel_dropout"]
         self.p_channel_dropout = config["p_channel_dropout"]
+        self.attention = config["attention"]
         self.subject_layer = config["subject_layer"]
 
         self.channel_dropout = channel_dropout(num_channels=295)
+
+        loc = np.load("/home/ubuntu/BrainDecoding/configs/montage.npy")
+        loc = torch.from_numpy(loc.astype(np.float32))
+        self.spatial_attention = SpatialAttention(
+            loc=loc,
+            D1=270,
+            K=32
+        )
 
         self.subject_block = SubjectBlock(num_subjects=num_subjects)
 
@@ -98,6 +150,9 @@ class NaiveModel(nn.Module):
     def forward(self, x, s, sbj_list):
         s_mapping = {subject: idx for idx, subject in enumerate(sbj_list)}
         s = [s_mapping[int(i)] for i in s]
+
+        if self.attention:
+            x = self.spatial_attention(x)
 
         if self.channel_dropout:
             x = self.channel_dropout(x, p=self.p_channel_dropout)

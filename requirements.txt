@@ -2,10 +2,13 @@ omegaconf
 torch
 numpy
 scipy
-torchaudio
-wandb
+torchvision
 tqdm
 transformers
 mne
 mne-bids
 natsort
+tensorboard
+einops
+termcolor
+scikit-learn

@@ -12,6 +12,7 @@ def parse_args():
     type=str,
     default="configs/config.yaml",
   )
+  parser.add_argument('--root', type=str, required=False, default=None)
   return parser.parse_args()
 
 def load_yaml_config(config_filename: str) -> dict:

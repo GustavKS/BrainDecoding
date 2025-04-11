@@ -146,5 +146,6 @@ dmypy.json
 
 # Aim logging
 .aim
+nohup.out
 
 outputs/
