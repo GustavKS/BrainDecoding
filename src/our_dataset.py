@@ -29,7 +29,7 @@ class meg_dataset(torch.utils.data.Dataset):
       nights = nights[3:]
     self.s = s
     s = f"S{int(s):02d}"
-
+    mne.set_config('MNE_USE_CUDA', 'true')
     self.all_meg_data = []
     self.all_epochs = []
     cprint("Analysing Subject: " + s + ", nights: " + str(nights), 'blue', attrs=['bold'])
@@ -42,20 +42,22 @@ class meg_dataset(torch.utils.data.Dataset):
       self.data_path = os.path.join(self.root, s, night, wm)
 
       raw = mne.io.read_raw_ctf(self.data_path, preload=True, verbose=False)
-      raw.pick_types(meg=True, stim=True, eeg=False, ref_meg=True, verbose=False)
+      raw.pick_types(meg=True, stim=True, eeg=False, ref_meg=False, verbose=False)
       if "MRP54-4016" in raw.ch_names:
         raw.drop_channels(["MRP54-4016"])
+      if config["filter"]:
+        raw.filter(config["filter_low"], config["filter_high"], picks='mag', n_jobs='cuda', h_trans_bandwidth=config["filter_high"]/10, l_trans_bandwidth=config["filter_low"]/10, verbose=False)
       events = mne.find_events(raw, stim_channel='UDIO001', initial_event=True, verbose=False)
       event_ids = {"maint_FACE": 43, "maint_HOUSE": 53}
 
       events[:,2] = events[:,2] - 255
       sel = np.where(events[:, 2] <= 255)[0]
       events = events[sel, :]
-      picks = mne.pick_types(raw.info, meg='mag', eeg=False, stim=False)
+      picks = mne.pick_types(raw.info, meg='mag', eeg=False, stim=False, ref_meg=False)
       self.epochs = mne.Epochs(raw, events, event_ids,  picks=picks, tmin=0, tmax=4,\
                           baseline=None, preload=True, verbose=False)
       self.epochs.resample(120, verbose=False)
-      self.epochs.apply_function(partial(scale_clamp, clamp_lim=config["clamp"]), n_jobs=8)
+      self.epochs.apply_function(partial(scale_clamp, clamp_lim=config["clamp"]), n_jobs=10, verbose=False)
       self.meg_data = torch.from_numpy(self.epochs.get_data(picks='meg')).to(torch.float32)
       self.all_meg_data.append(self.meg_data)
       self.all_epochs.append(self.epochs)
@@ -64,6 +66,8 @@ class meg_dataset(torch.utils.data.Dataset):
     for ep in self.all_epochs:
       ep.info['dev_head_t'] = self.all_epochs[0].info['dev_head_t']
     self.all_epochs = mne.concatenate_epochs(self.all_epochs, verbose=False)
+
+    #np.random.shuffle(self.all_epochs.events[:, 2])
     
   def __len__(self):
     return len(self.all_meg_data)

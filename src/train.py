@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm import tqdm
 
-from models import naive_dec, brain_enc
+from models import naive_dec
 from utils import parse_args, load_yaml_config, make_exp_folder
 import our_dataset as our_dataset
 
@@ -46,8 +46,8 @@ if __name__ == "__main__":
   train_dataset = torch.utils.data.Subset(dataset, train_idcs)
   val_dataset = torch.utils.data.Subset(dataset, val_idcs)
 
-  train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
-  val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False)
+  train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
+  val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
 
   backbone = torchvision.models.resnet18(weights=None)
   backbone.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)

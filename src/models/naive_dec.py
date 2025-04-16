@@ -43,7 +43,7 @@ class SpatialAttention(nn.Module):
 
 
 class channel_dropout(nn.Module):
-    def __init__(self, num_channels: int = 295):
+    def __init__(self, num_channels: int = 268):
         super().__init__()
         self.num_channels = num_channels
 
@@ -59,7 +59,7 @@ class SubjectBlock(nn.Module):
         self,
         num_subjects: int,
         D1: int = 270,
-        num_channels: int = 295,
+        num_channels: int = 268,
     ):
         super().__init__()
 
@@ -67,7 +67,7 @@ class SubjectBlock(nn.Module):
         self.num_channels = num_channels
 
         self.conv = nn.Conv1d(
-            in_channels=num_channels,
+            in_channels=D1,
             out_channels=D1,
             kernel_size=1,
             stride=1,
@@ -86,8 +86,7 @@ class SubjectBlock(nn.Module):
         )
 
     def forward(self, X: torch.Tensor, subject_idxs):
-        if X.shape[1] == self.num_channels:
-            X = self.conv(X)    
+        X = self.conv(X)    
         X = torch.cat(
             [
                 self.subject_layer[i](x.unsqueeze(dim=0))
@@ -111,9 +110,9 @@ class NaiveModel(nn.Module):
         self.attention = config["attention"]
         self.subject_layer = config["subject_layer"]
 
-        self.channel_dropout = channel_dropout(num_channels=295)
+        self.channel_dropout = channel_dropout(num_channels=268)
 
-        loc = np.load("/home/ubuntu/BrainDecoding/configs/montage.npy")
+        loc = np.load("/home/ubuntu/BrainDecoding/configs/layout.npy")
         loc = torch.from_numpy(loc.astype(np.float32))
         self.spatial_attention = SpatialAttention(
             loc=loc,

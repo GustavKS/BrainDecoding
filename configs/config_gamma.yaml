@@ -1,11 +1,11 @@
-experiment_folder: delta
+experiment_folder: freq/gamma
 
 root_dir: /vol/megdata/raw/
 
 clamp: 5.0
 filter: True
-filter_low: 0.3
-filter_high: 4.0
+filter_low: 30.0
+filter_high: 60.0
 
 batch_size: 128
 learning_rate: 1e-4
