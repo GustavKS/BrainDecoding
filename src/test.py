@@ -14,7 +14,7 @@ if __name__ == "__main__":
     config = load_yaml_config(config_filename=args.config)
     config = OmegaConf.create(config)
 
-    root = args.root if args.root is not None else "outputs/test_7sbjs_drop0.1_20250411"
+    root = args.root if args.root is not None else "outputs/regularizeITMORE_7sbjs_drop0.5_20250424"
     root = root + "/"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     print("Expected Number of samples:", 400 * 1 * len(subjects), "Actual Number of samples:", len(dataset))
 
-    test_dataloader = torch.utils.data.DataLoader(dataset, batch_size=config['batch_size'], shuffle=False)
+    test_dataloader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False)
 
     backbone = torchvision.models.resnet18(weights=None)
     backbone.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)

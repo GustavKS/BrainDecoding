@@ -65,13 +65,7 @@ class SubjectBlock(nn.Module):
 
         self.num_subjects = num_subjects
         self.num_channels = num_channels
-        
-        self.conv_raw = nn.Conv1d(
-            in_channels=num_channels,
-            out_channels=D1,
-            kernel_size=1,
-            stride=1,
-        )
+
         self.conv = nn.Conv1d(
             in_channels=D1,
             out_channels=D1,
@@ -92,10 +86,7 @@ class SubjectBlock(nn.Module):
         )
 
     def forward(self, X: torch.Tensor, subject_idxs):
-        if X.shape[1] == self.num_channels:
-            X = self.conv_raw(X)
-        else:
-            X = self.conv(X)    
+        X = self.conv(X)    
         X = torch.cat(
             [
                 self.subject_layer[i](x.unsqueeze(dim=0))
@@ -104,13 +95,68 @@ class SubjectBlock(nn.Module):
         )
         return X
     
+class ConvBlock(nn.Module):
+    def __init__(
+        self,
+        k: int,
+        D1: int= 270,
+        D2: int= 320,
+        ksize: int = 3,
+        p_drop: float = 0.1,
+    ) -> None:
+        super().__init__()
+
+        self.k = k
+        in_channels = D1 if k == 0 else D2
+
+        self.conv0 = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=D2,
+            kernel_size=ksize,
+            padding="same",
+            dilation=2 ** ((2 * self.k) % 5),
+        )
+        self.batchnorm0 = nn.BatchNorm1d(num_features=D2)
+        self.conv1 = nn.Conv1d(
+            in_channels=D2,
+            out_channels=D2,
+            kernel_size=ksize,
+            padding="same",
+            dilation=2 ** ((2 * self.k + 1) % 5),
+        )
+        self.batchnorm1 = nn.BatchNorm1d(num_features=D2)
+        self.conv2 = nn.Conv1d(
+            in_channels=D2,
+            out_channels=2 * D2,
+            kernel_size=ksize,
+            padding="same",
+            dilation=2,  # NOTE: The text doesn't say this, but the picture shows dilation=2
+        )
+        self.dropout = nn.Dropout(p=p_drop)
+
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        if self.k == 0:
+            X = self.conv0(X)
+        else:
+            X = self.conv0(X) + X  # skip connection
+
+        X = F.gelu(self.batchnorm0(X))
+
+        X = self.conv1(X) + X  # skip connection
+        X = F.gelu(self.batchnorm1(X))
+
+        X = self.conv2(X)
+        X = F.glu(X, dim=-2)
+
+        return self.dropout(X)
+    
 class CustomBatchNorm1d(nn.BatchNorm1d):
     def forward(self, input):
         if input.size(0) == 1:
             return input
         return super().forward(input)
 
-class NaiveModel(nn.Module):
+class BrainDecoder(nn.Module):
     def __init__(self, backbone: nn.Module, num_subjects: int, config):
         super().__init__()
 
@@ -131,13 +177,16 @@ class NaiveModel(nn.Module):
 
         self.subject_block = SubjectBlock(num_subjects=num_subjects)
 
-        self.backbone = backbone
+        self.conv_blocks = nn.Sequential()
+        for k in range(5):
+            self.conv_blocks.add_module(f"conv{k}", ConvBlock(k, 270, 320))
 
-        out_features = list(self.backbone.modules())[-1].out_features
+        self.conv_final1 = nn.Conv1d(in_channels=320, out_channels=320, kernel_size=1,)
+        self.conv_final2 = nn.Conv1d(in_channels=320, out_channels=370, kernel_size=1,)
         
         self.cls_head = nn.Sequential(
             nn.Dropout(p=0.5),
-            nn.Linear(out_features, 512),
+            nn.Linear(370*480, 512),
             CustomBatchNorm1d(512),
             nn.ReLU(),
 
@@ -159,16 +208,18 @@ class NaiveModel(nn.Module):
         s_mapping = {subject: idx for idx, subject in enumerate(sbj_list)}
         s = [s_mapping[int(i)] for i in s]
 
-        if self.channel_dropout:
-            x = self.channel_dropout(x, p=self.p_channel_dropout)
-
         if self.attention:
             x = self.spatial_attention(x)
+
+        if self.channel_dropout:
+            x = self.channel_dropout(x, p=self.p_channel_dropout)
 
         if self.subject_layer:
             x = self.subject_block(x, s)
             
-        x = x.unsqueeze(1)
-        x = self.backbone(x)
+        x = self.conv_blocks(x)
+        x = F.gelu(self.conv_final1(x))
+        x = F.gelu(self.conv_final2(x))
+        x = torch.flatten(x, start_dim=1)
         output = self.cls_head(x)
         return output

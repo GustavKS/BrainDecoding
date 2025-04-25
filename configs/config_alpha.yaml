@@ -13,6 +13,6 @@ num_epochs: 100
 
 
 channel_dropout: True
-p_channel_dropout: 0.3
+p_channel_dropout: 0.5
 attention: True
 subject_layer: True

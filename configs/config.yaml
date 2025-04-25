@@ -1,18 +1,19 @@
-experiment_folder: delta
+experiment_folder: base_resnet50
 
 root_dir: /vol/megdata/raw/
 
 clamp: 5.0
-filter: True
+spectrogram: False
+filter: False
 filter_low: 0.3
-filter_high: 4.0
+filter_high: 30.0
 
-batch_size: 128
+batch_size: 32
 learning_rate: 1e-4
-num_epochs: 100
+num_epochs: 2500
 
 
-channel_dropout: True
-p_channel_dropout: 0.3
+channel_dropout: False
+p_channel_dropout: 0.2
 attention: True
 subject_layer: True

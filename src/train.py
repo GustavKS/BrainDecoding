@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm import tqdm
 
-from models import naive_dec
+from models import naive_dec, brain_dec
 from utils import parse_args, load_yaml_config, make_exp_folder
 import our_dataset as our_dataset
 
@@ -21,7 +21,7 @@ if __name__ == "__main__":
   args = parse_args()
   config = load_yaml_config(config_filename=args.config)
   config = OmegaConf.create(config)
-  config['experiment_folder'] = f"{config.get('experiment_folder')}_{str(len(subjects))}sbjs_drop{config.get('p_channel_dropout')}_{datetime.now().strftime('%Y%m%d')}"
+  config['experiment_folder'] = f"{config.get('experiment_folder')}_{str(len(subjects))}sbjs_{datetime.now().strftime('%Y%m%d')}"
   experiment_folder = make_exp_folder(config)
 
   print(f"[EXP_FOLDER]{experiment_folder}")
@@ -37,7 +37,7 @@ if __name__ == "__main__":
   
   dataset = torch.utils.data.ConcatDataset(datasets)
 
-  print("Expected Number of samples:", 3*400*len(subjects), "Actual Number of samples:", len(dataset))
+  print("Expected Number of samples:", 3*50*len(subjects), "Actual Number of samples:", len(dataset))
   train_idcs = np.arange(0, len(dataset))
   np.random.seed(42)
   np.random.shuffle(train_idcs)
@@ -49,15 +49,16 @@ if __name__ == "__main__":
   train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
   val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
 
-  backbone = torchvision.models.resnet18(weights=None)
+  backbone = torchvision.models.resnet50(weights=None)
   backbone.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
   model = naive_dec.NaiveModel(backbone, len(subjects), config).to(device)
+  #model = brain_dec.BrainDecoder(None, len(subjects), config).to(device)
 
   optimizer = torch.optim.Adam(model.parameters(), lr=float(config['learning_rate']))
-  scheduler = CosineAnnealingLR(optimizer, T_max=config['num_epochs'], eta_min=1e-5)
+  #scheduler = CosineAnnealingLR(optimizer, T_max=config['num_epochs'], eta_min=1e-6)
   loss_fn = nn.CrossEntropyLoss()
 
-  val_losses = []
+  val_accs = []
   for epoch in range(config['num_epochs']):
       model.train()
       progress_bar = tqdm(train_dataloader, desc=f'Epoch {epoch+1}', unit='batch', leave=False)
@@ -111,12 +112,12 @@ if __name__ == "__main__":
       writer.add_scalar('Loss/val', lossinho/len(val_dataloader), epoch)
       writer.add_scalar('Accuracy/val', accuracy, epoch)
 
-      val_losses.append(lossinho/len(val_dataloader))
-      if lossinho/len(val_dataloader) <= min(val_losses):
+      val_accs.append(accuracy)
+      if accuracy >= max(val_accs):
           torch.save(model.state_dict(), f'{experiment_folder}/best_model.pth')
           torch.save({"outputs": torch.cat(all_val_outputs, dim=0), "labels": torch.cat(all_val_labels, dim=0), "subjects": torch.cat(all_subjects, dim=0)}, f'{experiment_folder}/val_outputs.pt')
           torch.save({"outputs": torch.cat(all_train_outputs, dim=0), "labels": torch.cat(all_train_labels, dim=0), "subjects": torch.cat(all_subjects, dim=0)}, f'{experiment_folder}/train_outputs.pt')
           print(f'Saved best model at epoch {epoch+1}')
-      scheduler.step()
-      writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], epoch)
+      #scheduler.step()
+      #writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], epoch)
   writer.close()
