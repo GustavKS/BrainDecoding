@@ -16,13 +16,13 @@ import our_dataset as our_dataset
 from termcolor import cprint
 
 if __name__ == "__main__":
-  subjects = [2, 4, 5, 6, 7, 10, 11]
-
   args = parse_args()
   config = load_yaml_config(config_filename=args.config)
   config = OmegaConf.create(config)
-  config['experiment_folder'] = f"{config.get('experiment_folder')}_{str(len(subjects))}sbjs_{datetime.now().strftime('%Y%m%d')}"
-  experiment_folder = make_exp_folder(config)
+  config['experiment_folder'] = f"{config.get('experiment_folder')}_{datetime.now().strftime('%Y%m%d_%H%M')}"
+  experiment_folder = make_exp_folder(config, args.run)
+
+  subjects = config["subjects"]
 
   print(f"[EXP_FOLDER]{experiment_folder}")
 
@@ -30,27 +30,41 @@ if __name__ == "__main__":
 
   writer = SummaryWriter(experiment_folder)
   datasets = []
-  
+  val_datasets = []
   for i in subjects:
-    datasets.append(our_dataset.meg_dataset(config=config, s=i, train=True))
+    datasets.append(our_dataset.meg_dataset(config=config, s=i, transform = config['transform'], train=True))
+    val_datasets.append(our_dataset.meg_dataset(config=config, s=i, transform = False, train=True))
     cprint("Subject: " + str(i) + ", Number of samples: " + str(len(datasets[-1])), "yellow")
   
   dataset = torch.utils.data.ConcatDataset(datasets)
+  val_dataset = torch.utils.data.ConcatDataset(val_datasets)
 
   print("Expected Number of samples:", 3*50*len(subjects), "Actual Number of samples:", len(dataset))
-  train_idcs = np.arange(0, len(dataset))
-  np.random.seed(42)
-  np.random.shuffle(train_idcs)
-  train_idcs = train_idcs[:int(len(train_idcs)*0.8)]
-  val_idcs = np.setdiff1d(np.arange(0, len(dataset)), train_idcs)
-  train_dataset = torch.utils.data.Subset(dataset, train_idcs)
-  val_dataset = torch.utils.data.Subset(dataset, val_idcs)
+  labels = np.array([0 if dataset[i][1] == 43 else 1 for i in range(len(dataset))])
 
+  class_0_idx, class_1_idx = np.where(labels == 0)[0], np.where(labels == 1)[0]
+
+  np.random.seed(42)
+  np.random.shuffle(class_0_idx)
+  np.random.shuffle(class_1_idx)
+
+  val_samples_per_class = min(len(class_0_idx), len(class_1_idx)) // 5
+
+  val_idcs = np.concatenate((class_0_idx[:val_samples_per_class], class_1_idx[:val_samples_per_class]))
+  train_idcs = np.setdiff1d(np.arange(len(dataset)), val_idcs)
+
+  train_dataset = torch.utils.data.Subset(dataset, train_idcs)
+  val_dataset = torch.utils.data.Subset(val_dataset, val_idcs)
+  print("Train samples:", len(train_dataset), "Validation samples:", len(val_dataset))
+  
   train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
   val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
 
-  backbone = torchvision.models.resnet50(weights=None)
+  backbone = torchvision.models.resnet18(weights=None)
   backbone.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+  #backbone.load_state_dict(torch.load("/home/ubuntu/BrainDecoding/outputs/ET/backbonesjlayeratttrans_resample_20250429/best_model.pth", weights_only=True), strict=False)
+  #for param in backbone.parameters():
+  #  param.requires_grad = False
   model = naive_dec.NaiveModel(backbone, len(subjects), config).to(device)
   #model = brain_dec.BrainDecoder(None, len(subjects), config).to(device)
 
@@ -113,7 +127,7 @@ if __name__ == "__main__":
       writer.add_scalar('Accuracy/val', accuracy, epoch)
 
       val_accs.append(accuracy)
-      if accuracy >= max(val_accs):
+      if accuracy == max(val_accs):
           torch.save(model.state_dict(), f'{experiment_folder}/best_model.pth')
           torch.save({"outputs": torch.cat(all_val_outputs, dim=0), "labels": torch.cat(all_val_labels, dim=0), "subjects": torch.cat(all_subjects, dim=0)}, f'{experiment_folder}/val_outputs.pt')
           torch.save({"outputs": torch.cat(all_train_outputs, dim=0), "labels": torch.cat(all_train_labels, dim=0), "subjects": torch.cat(all_subjects, dim=0)}, f'{experiment_folder}/train_outputs.pt')

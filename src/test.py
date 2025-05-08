@@ -14,18 +14,18 @@ if __name__ == "__main__":
     config = load_yaml_config(config_filename=args.config)
     config = OmegaConf.create(config)
 
-    root = args.root if args.root is not None else "outputs/regularizeITMORE_7sbjs_drop0.5_20250424"
+    root = args.root if args.root is not None else "outputs/MT/subj_10_20250507_0957"
     root = root + "/"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     datasets = []
-    subjects = [2, 4, 5, 6, 7, 10, 11]
+    subjects = config["subjects"]
     for i in subjects:
-        datasets.append(our_dataset.meg_dataset(config=config, s=i, train=False))
+        datasets.append(our_dataset.meg_dataset(config=config, s=i, transform = False, train=False))
 
     dataset = torch.utils.data.ConcatDataset(datasets)
 
-    print("Expected Number of samples:", 400 * 1 * len(subjects), "Actual Number of samples:", len(dataset))
+    print("Expected Number of samples:", 50 * 1 * len(subjects), "Actual Number of samples:", len(dataset))
 
     test_dataloader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False)
 

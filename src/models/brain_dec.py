@@ -65,7 +65,13 @@ class SubjectBlock(nn.Module):
 
         self.num_subjects = num_subjects
         self.num_channels = num_channels
-
+        
+        self.conv_raw = nn.Conv1d(
+            in_channels=num_channels,
+            out_channels=D1,
+            kernel_size=1,
+            stride=1,
+        )
         self.conv = nn.Conv1d(
             in_channels=D1,
             out_channels=D1,
@@ -86,7 +92,10 @@ class SubjectBlock(nn.Module):
         )
 
     def forward(self, X: torch.Tensor, subject_idxs):
-        X = self.conv(X)    
+        if X.shape[1] == self.num_channels:
+            X = self.conv_raw(X)
+        else:
+            X = self.conv(X)    
         X = torch.cat(
             [
                 self.subject_layer[i](x.unsqueeze(dim=0))
