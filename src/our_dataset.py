@@ -50,7 +50,7 @@ class MEGTransform(object):
         RandomResample(min_freq=2, max_freq=120, probability=0.5),
         #torchvision.transforms.RandomVerticalFlip(),
         #torchvision.transforms.RandomResizedCrop((268, 120), scale=(0.4, 1.0), ratio=(268/120, 268/120)),
-        torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.60), value=0)
+        torchvision.transforms.RandomErasing(p=0.75, scale=(0.02, 0.60), value=0)
     ])
   def __call__(self, sample):
     sample = sample.unsqueeze(0)

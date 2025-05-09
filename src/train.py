@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
   class_0_idx, class_1_idx = np.where(labels == 0)[0], np.where(labels == 1)[0]
 
-  np.random.seed(42)
+  np.random.seed(args.run)
   np.random.shuffle(class_0_idx)
   np.random.shuffle(class_1_idx)
 
@@ -126,8 +126,8 @@ if __name__ == "__main__":
       writer.add_scalar('Loss/val', lossinho/len(val_dataloader), epoch)
       writer.add_scalar('Accuracy/val', accuracy, epoch)
 
-      val_accs.append(accuracy)
-      if accuracy == max(val_accs):
+      val_accs.append(lossinho/len(val_dataloader))
+      if lossinho/len(val_dataloader) == min(val_accs):
           torch.save(model.state_dict(), f'{experiment_folder}/best_model.pth')
           torch.save({"outputs": torch.cat(all_val_outputs, dim=0), "labels": torch.cat(all_val_labels, dim=0), "subjects": torch.cat(all_subjects, dim=0)}, f'{experiment_folder}/val_outputs.pt')
           torch.save({"outputs": torch.cat(all_train_outputs, dim=0), "labels": torch.cat(all_train_labels, dim=0), "subjects": torch.cat(all_subjects, dim=0)}, f'{experiment_folder}/train_outputs.pt')
